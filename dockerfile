@@ -1,6 +1,6 @@
 #Download base image.
 #The ubuntu:20.04 tag points to the "20.04 LTS"
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 #Set location to download ARM toolkit from.
 # This will need to be changed over time or replaced with a static link to the latest release.
