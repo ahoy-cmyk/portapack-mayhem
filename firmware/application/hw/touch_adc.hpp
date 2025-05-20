@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2015 Jared Boone, ShareBrained Technology, Inc.
+ * copyleft (ɔ) 2023 zxkmm under GPL license
+ * Copyright (C) 2023 u-foka
  *
  * This file is part of PortaPack.
  *
@@ -35,4 +37,4 @@ Samples get();
 } /* namespace adc */
 } /* namespace touch */
 
-#endif/*__TOUCH_ADC_H__*/
+#endif /*__TOUCH_ADC_H__*/

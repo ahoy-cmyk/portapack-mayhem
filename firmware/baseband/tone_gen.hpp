@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2015 Jared Boone, ShareBrained Technology, Inc.
  * Copyright (C) 2017 Furrtek
- * 
+ * Copyright (C) 2024 Mark Thompson
+ *
  * This file is part of PortaPack.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -27,42 +28,22 @@
 #include <cstddef>
 
 class ToneGen {
-public:
-	enum tone_type { sine, square };    // TODO:  Added for Radio Sonde.cpp PR 376, 381 , we need to check if keep or not.
+   public:
+    void configure(const uint32_t delta, const float tone_mix_weight);
+    int32_t process(const int32_t sample_in);
 
-	/*ToneGen(const size_t sample_rate
-	) : sample_rate_ { sample_rate }
-	{};*/
+    void configure_beep(const uint32_t freq, const uint32_t sample_rate);
+    int16_t process_beep();
 
-	void configure(const uint32_t delta, const float tone_mix_weight);
-	void configure(const uint32_t freq, const float tone_mix_weight, const tone_type tone_type, const uint32_t sample_rate);
+   private:
+    float input_mix_weight_{1};
+    float tone_mix_weight_{0};
 
-	int32_t process(const int32_t sample_in);
-	int32_t process_square(const int32_t sample_in);
+    float f_delta_{0.0};
+    float f_tone_phase_{0.0};
 
-private:
-	tone_type current_tone_type_ { sine };
-
-	float input_mix_weight_ { 1 };
-	float tone_mix_weight_ { 0 };
-
-	uint32_t delta_ { 0 };
-	uint32_t tone_phase_ { 0 };
-
-//	uint8_t delta_ { 0 };		// TODO:  Added for Radio Sonde.cpp PR 376, 381 , we need to check if keep or not.
-//	uint8_t tone_phase_ { 0 };  // TODO:  Added for Radio Sonde.cpp PR 376, 381 , we need to check if keep or not.
-
-	/**
-	 * Generator function which selects every other sample from the reference sine waveform to the output sample:
-	 */
-	int32_t tone_sine();// TODO:  Added for Radio Sonde.cpp PR 376, 381 , we need to check if keep or not.
-
-
-	/**
-	 * Generator function for square waves:
-	 */	
-	int32_t tone_square();		// TODO:  Added for Radio Sonde.cpp PR 376, 381 , we need to check if keep or not.
-
+    uint32_t delta_{0};
+    uint32_t tone_phase_{0};
 };
 
 #endif /* __TONE_GEN_H__ */

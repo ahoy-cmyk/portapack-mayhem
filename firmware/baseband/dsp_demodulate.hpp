@@ -23,53 +23,61 @@
 #define __DSP_DEMODULATE_H__
 
 #include "dsp_types.hpp"
+#include "dsp_hilbert.hpp"
 
 namespace dsp {
 namespace demodulate {
 
 class AM {
-public:
-	buffer_f32_t execute(
-		const buffer_c16_t& src,
-		const buffer_f32_t& dst
-	);
+   public:
+    buffer_f32_t execute(
+        const buffer_c16_t& src,
+        const buffer_f32_t& dst);
 
-private:
-	static constexpr float k = 1.0f / 32768.0f;
+   private:
+    static constexpr float k = 1.0f / 32768.0f;
 };
 
 class SSB {
-public:
-	buffer_f32_t execute(
-		const buffer_c16_t& src,
-		const buffer_f32_t& dst
-	);
+   public:
+    buffer_f32_t execute(
+        const buffer_c16_t& src,
+        const buffer_f32_t& dst);
 
-private:
-	static constexpr float k = 1.0f / 32768.0f;
+   private:
+    static constexpr float k = 1.0f / 32768.0f;
+};
+
+class SSB_FM {  // Added to handle AMFM for WFAX
+   public:
+    buffer_f32_t execute(
+        const buffer_c16_t& src,
+        const buffer_f32_t& dst);
+
+   private:
+    static constexpr float k = 1.0f / 32768.0f;
+    dsp::Real_to_Complex real_to_complex{};  // It is a member variable of SSB_FM.
 };
 
 class FM {
-public:
-	buffer_f32_t execute(
-		const buffer_c16_t& src,
-		const buffer_f32_t& dst
-	);
+   public:
+    buffer_f32_t execute(
+        const buffer_c16_t& src,
+        const buffer_f32_t& dst);
 
-	buffer_s16_t execute(
-		const buffer_c16_t& src,
-		const buffer_s16_t& dst
-	);
+    buffer_s16_t execute(
+        const buffer_c16_t& src,
+        const buffer_s16_t& dst);
 
-	void configure(const float sampling_rate, const float deviation_hz);
+    void configure(const float sampling_rate, const float deviation_hz);
 
-private:
-	complex16_t::rep_type z_ { 0 };
-	float kf { 0 };
-	float ks16 { 0 };
+   private:
+    complex16_t::rep_type z_{0};
+    float kf{0};
+    float ks16{0};
 };
 
 } /* namespace demodulate */
 } /* namespace dsp */
 
-#endif/*__DSP_DEMODULATE_H__*/
+#endif /*__DSP_DEMODULATE_H__*/

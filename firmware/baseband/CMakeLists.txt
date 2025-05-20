@@ -27,6 +27,8 @@
 
 enable_language(C CXX ASM)
 
+include(CheckCXXCompilerFlag)
+
 project(baseband_shared)
 
 # Compiler options here.
@@ -36,7 +38,13 @@ set(USE_OPT "-O3 -g -falign-functions=16 -fno-math-errno --specs=nano.specs")
 set(USE_COPT "-std=gnu99")
 
 # C++ specific options here (added to USE_OPT).
-set(USE_CPPOPT "-std=c++17 -fno-rtti -fno-exceptions -Weffc++ -Wuninitialized")
+check_cxx_compiler_flag("-std=c++20" cpp20_supported)
+if(cpp20_supported)
+	set(USE_CPPOPT "-std=c++20")
+else()
+	set(USE_CPPOPT "-std=c++17")
+endif()
+set(USE_CPPOPT "${USE_CPPOPT} -fno-rtti -fno-exceptions -Weffc++ -Wuninitialized -Wno-volatile")
 
 # Enable this if you want the linker to remove unused code and data
 set(USE_LINK_GC yes)
@@ -139,6 +147,8 @@ set(CPPSRC
 	${COMMON}/chibios_cpp.cpp
 	debug.cpp
 	${COMMON}/gcc.cpp
+	${COMMON}/performance_counter.cpp
+	${COMMON}/random.cpp
 	tone_gen.cpp
 )
 
@@ -255,11 +265,13 @@ include_directories(. ${INCDIR})
 #######################################################################
 
 set(BASEBAND_IMAGES)
+set(BASEBAND_EXTERNAL_IMAGES)
 
 macro(DeclareTargets chunk_tag name)
 	project("baseband_${name}")
 
 	include(${RULESPATH}/rules.cmake)
+	set_source_files_properties(${MODE_CPPSRC} PROPERTIES COMPILE_FLAGS "${MODE_FLAGS}")
 	add_executable(${PROJECT_NAME}.elf $<TARGET_OBJECTS:baseband_shared> ${MODE_CPPSRC} ${HALSRC} ${PLATFORMSRC})
 	set_target_properties(${PROJECT_NAME}.elf PROPERTIES LINK_DEPENDS ${LDSCRIPT})
 	add_definitions(${DEFS})
@@ -267,26 +279,43 @@ macro(DeclareTargets chunk_tag name)
 	include_directories(. ${INCDIR} ${MODE_INCDIR})
 	link_directories(${LLIBDIR})
 	target_link_libraries(${PROJECT_NAME}.elf ${LIBS})
+	
 	target_link_libraries(${PROJECT_NAME}.elf -Wl,-Map=${PROJECT_NAME}.map)
+	target_link_libraries(${PROJECT_NAME}.elf -Wl,--print-memory-usage)
 
-	add_custom_command(
-		OUTPUT ${PROJECT_NAME}.bin ${PROJECT_NAME}.img
-		COMMAND ${CMAKE_OBJCOPY} -O binary ${PROJECT_NAME}.elf ${PROJECT_NAME}.bin
-		COMMAND ${LZ4} -f -9 ${PROJECT_NAME}.bin ${PROJECT_NAME}.lz4
-		COMMAND ${MAKE_IMAGE_CHUNK} ${PROJECT_NAME}.lz4 ${chunk_tag} ${PROJECT_NAME}.img
-		DEPENDS ${PROJECT_NAME}.elf ${MAKE_IMAGE_CHUNK}
-		VERBATIM
-	)
+	if(add_to_firmware)
 
-	set(BASEBAND_IMAGES ${BASEBAND_IMAGES} ${PROJECT_NAME}.img)
+		add_custom_command(
+			OUTPUT ${chunk_tag}.bin ${PROJECT_NAME}.img
+			COMMAND ${CMAKE_OBJCOPY} -O binary ${PROJECT_NAME}.elf ${chunk_tag}.bin
+			COMMAND ${LZ4} -f -9 ${chunk_tag}.bin ${PROJECT_NAME}.lz4
+			COMMAND ${MAKE_IMAGE_CHUNK} ${PROJECT_NAME}.lz4 ${chunk_tag} ${PROJECT_NAME}.img
+			DEPENDS ${PROJECT_NAME}.elf ${MAKE_IMAGE_CHUNK}
+			VERBATIM
+		)
+
+		set(BASEBAND_IMAGES ${BASEBAND_IMAGES} ${PROJECT_NAME}.img)
+
+	else()
+
+		add_custom_command(
+			OUTPUT ${chunk_tag}.bin
+			COMMAND ${CMAKE_OBJCOPY} -O binary ${PROJECT_NAME}.elf ${chunk_tag}.bin
+			DEPENDS ${PROJECT_NAME}.elf
+			VERBATIM
+		)
+
+		set(BASEBAND_EXTERNAL_IMAGES ${BASEBAND_EXTERNAL_IMAGES} ${chunk_tag}.bin)
+
+	endif()
+
+
+
 endmacro()
 
-### ACARS RX
+set(add_to_firmware TRUE)
+set(MODE_FLAGS "-O3")
 
-set(MODE_CPPSRC
-	proc_acars.cpp
-)
-DeclareTargets(PACA acars)
 
 ### ADS-B RX
 
@@ -295,26 +324,13 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PADR adsbrx)
 
-### ADS-B TX
 
-set(MODE_CPPSRC
-	proc_adsbtx.cpp
-)
-DeclareTargets(PADT adsbtx)
-
-### AFSK
+### AFSK TX
 
 set(MODE_CPPSRC
 	proc_afsk.cpp
 )
 DeclareTargets(PAFT afsktx)
-
-### AFSK RX
-
-set(MODE_CPPSRC
-	proc_afskrx.cpp
-)
-DeclareTargets(PAFR afskrx)
 
 ### APRS RX
 
@@ -323,12 +339,6 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PAPR aprsrx)
 
-### NRF RX
-
-set(MODE_CPPSRC
-	proc_nrfrx.cpp
-)
-DeclareTargets(PNRR nrfrx)
 
 ### BTLE RX
 
@@ -336,6 +346,14 @@ set(MODE_CPPSRC
 	proc_btlerx.cpp
 )
 DeclareTargets(PBTR btlerx)
+
+### BTLE TX
+
+set(MODE_CPPSRC
+	proc_ble_tx.cpp
+)
+DeclareTargets(PBTT btletx)
+
 ### AIS
 
 set(MODE_CPPSRC
@@ -350,12 +368,6 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PAMA am_audio)
 
-### AM TV
-
-set(MODE_CPPSRC
-	proc_am_tv.cpp
-)
-DeclareTargets(PAMT am_tv)
 
 ### Audio transmit
 
@@ -392,12 +404,13 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PFSK fsktx)
 
-### Jammer
+### FSK RX
 
 set(MODE_CPPSRC
-	proc_jammer.cpp
+	proc_fsk_rx.cpp
 )
-DeclareTargets(PJAM jammer)
+DeclareTargets(PFSR fskrx)
+
 
 ### Microphone transmit
 
@@ -413,13 +426,6 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PNFM nfm_audio)
 
-### No op
-
-set(MODE_CPPSRC
-	proc_noop.cpp
-)
-DeclareTargets(PNOP no_operation)
-
 ### OOK
 
 set(MODE_CPPSRC
@@ -427,12 +433,13 @@ set(MODE_CPPSRC
 )
 DeclareTargets(POOK ook)
 
-### POCSAG RX
+
+### POCSAG2 RX
 
 set(MODE_CPPSRC
-	proc_pocsag.cpp
+	proc_pocsag2.cpp
 )
-DeclareTargets(PPOC pocsag)
+DeclareTargets(PPO2 pocsag2)
 
 ### RDS
 
@@ -448,13 +455,6 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PREP replay)
 
-### GPS Simulator
-
-set(MODE_CPPSRC
-	proc_gps_sim.cpp
-)
-DeclareTargets(PGPS gps_sim)
-
 ### Signal generator
 
 set(MODE_CPPSRC
@@ -462,19 +462,7 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PSIG siggen)
 
-### SSTV TX
 
-set(MODE_CPPSRC
-	proc_sstvtx.cpp
-)
-DeclareTargets(PSTX sstvtx)
-
-### Test
-
-set(MODE_CPPSRC
-	proc_test.cpp
-)
-DeclareTargets(PTST test)
 
 ### Tones
 
@@ -483,12 +471,6 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PTON tones)
 
-### TPMS
-
-set(MODE_CPPSRC
-	proc_tpms.cpp
-)
-DeclareTargets(PTPM tpms)
 
 ### Wideband Spectrum
 
@@ -503,6 +485,22 @@ set(MODE_CPPSRC
 	proc_wfm_audio.cpp
 )
 DeclareTargets(PWFM wfm_audio)
+
+### SubGhz Decoders
+
+set(MODE_CPPSRC
+	proc_subghzd.cpp
+)
+DeclareTargets(PSGD subghzd)
+
+
+### Weather Stations
+set(MODE_CPPSRC
+	proc_weather.cpp
+)
+DeclareTargets(PWTH weather)
+
+set(MODE_FLAGS "-Os")
 
 ### Flash Utility
 
@@ -524,7 +522,7 @@ set(MODE_INCDIR
 )
 set(MODE_CPPSRC
 	sd_over_usb/proc_sd_over_usb.cpp
-	
+
 	sd_over_usb/scsi.c
 	sd_over_usb/diskio.c
 	sd_over_usb/sd_over_usb.c
@@ -562,6 +560,130 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PUSB sd_over_usb)
 
+### Place external app and disabled images below so they don't get added to the firmware
+set(add_to_firmware FALSE)
+set(MODE_FLAGS "-O3")
+
+### ACARS RX
+
+set(MODE_CPPSRC
+	proc_acars.cpp
+)
+DeclareTargets(PACA acars)
+
+
+### AFSK RX
+
+set(MODE_CPPSRC
+	proc_afskrx.cpp
+)
+DeclareTargets(PAFR afskrx)
+
+### NRF RX
+
+set(MODE_CPPSRC
+	proc_nrfrx.cpp
+)
+DeclareTargets(PNRR nrfrx)
+
+### Jammer
+
+set(MODE_CPPSRC
+	proc_jammer.cpp
+)
+DeclareTargets(PJAM jammer)
+
+### AM TV
+
+set(MODE_CPPSRC
+	proc_am_tv.cpp
+)
+DeclareTargets(PAMT am_tv)
+
+### GPS Simulator
+
+set(MODE_CPPSRC
+	proc_gps_sim.cpp
+)
+DeclareTargets(PGPS gps_sim)
+
+### Spectrum painter
+
+set(MODE_CPPSRC
+	proc_spectrum_painter.cpp
+)
+DeclareTargets(PSPT spectrum_painter)
+
+### Test
+
+set(MODE_CPPSRC
+	proc_test.cpp
+)
+DeclareTargets(PTST test)
+
+### Audio Beep
+
+set(MODE_CPPSRC
+	proc_audio_beep.cpp
+)
+DeclareTargets(PABP audio_beep)
+
+
+### ProtoView
+
+set(MODE_CPPSRC
+	proc_protoview.cpp
+)
+DeclareTargets(PPVW protoview)
+
+
+### SSTV TX
+
+set(MODE_CPPSRC
+	proc_sstvtx.cpp
+)
+DeclareTargets(PSTX sstvtx)
+
+### TPMS
+
+set(MODE_CPPSRC
+	proc_tpms.cpp
+)
+DeclareTargets(PTPM tpms)
+
+
+### ADS-B TX
+
+set(MODE_CPPSRC
+	proc_adsbtx.cpp
+)
+DeclareTargets(PADT adsbtx)
+
+### OOKStream
+
+set(MODE_CPPSRC
+	proc_ook_stream_tx.cpp
+)
+DeclareTargets(POSK ookstream)
+
+
+
+### WeFax Rx
+
+set(MODE_CPPSRC
+	proc_wefaxrx.cpp
+)
+DeclareTargets(PWFX wefaxrx)
+
+
+### NoaaApt Rx
+
+set(MODE_CPPSRC
+	proc_noaaapt_rx.cpp
+)
+DeclareTargets(PNOA noaaapt_rx)
+
+
 ### HackRF "factory" firmware
 
 add_custom_command(
@@ -588,11 +710,11 @@ set(BASEBAND_IMAGES ${BASEBAND_IMAGES} terminator.img)
 #######################################################################
 
 project(baseband)
-	
+
 add_custom_command(
 	OUTPUT ${PROJECT_NAME}.img
 	COMMAND cat ${BASEBAND_IMAGES} > ${PROJECT_NAME}.img
-	DEPENDS ${BASEBAND_IMAGES}
+	DEPENDS ${BASEBAND_IMAGES} ${BASEBAND_EXTERNAL_IMAGES}
 	DEPENDS hackrf.img terminator.img
 	VERBATIM
 )

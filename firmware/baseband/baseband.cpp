@@ -27,61 +27,58 @@
 #include "portapack_dma.hpp"
 
 #include "gpdma.hpp"
-
 #include "audio_dma.hpp"
 
 static void init() {
-	audio::dma::init();
-	audio::dma::configure();
-	audio::dma::enable();
-
-	nvicEnableVector(DMA_IRQn, CORTEX_PRIORITY_MASK(LPC_DMA_IRQ_PRIORITY));
+    // Audio DMA initialization was moved to baseband proc's that actually use DMA audio, to save memory.
+    nvicEnableVector(DMA_IRQn, CORTEX_PRIORITY_MASK(LPC_DMA_IRQ_PRIORITY));
 }
 
 static void halt() {
-	port_disable();
-	while(true) {
-		port_wait_for_interrupt();
-	}
+    port_disable();
+    while (true) {
+        port_wait_for_interrupt();
+    }
 }
 
 extern "C" {
 
 void __late_init(void) {
-	/*
-	 * System initializations.
-	 * - HAL initialization, this also initializes the configured device drivers
-	 *   and performs the board-specific initializations.
-	 * - Kernel initialization, the main() function becomes a thread and the
-	 *   RTOS is active.
-	 */
-	halInit();
+    /*
+     * System initializations.
+     * - HAL initialization, this also initializes the configured device drivers
+     *   and performs the board-specific initializations.
+     * - Kernel initialization, the main() function becomes a thread and the
+     *   RTOS is active.
+     */
+    halInit();
 
-	/* After this call, scheduler, systick, heap, etc. are available. */
-	/* By doing chSysInit() here, it runs before C++ constructors, which may
-	 * require the heap.
-	 */
-	chSysInit();
+    /* After this call, scheduler, systick, heap, etc. are available. */
+    /* By doing chSysInit() here, it runs before C++ constructors, which may
+     * require the heap.
+     */
+    chSysInit();
 
-	/* Baseband initialization */
-	init();
+    /* Baseband initialization */
+    init();
 }
 
 void _default_exit(void) {
-	// TODO: Is this complete?
-	
-	nvicDisableVector(DMA_IRQn);
-	
-	chSysDisable();
+    // TODO: Is this complete?
 
-	systick_stop();
+    audio::dma::disable();
 
-	ShutdownMessage shutdown_message;
-	shared_memory.application_queue.push(shutdown_message);
+    nvicDisableVector(DMA_IRQn);
 
-	shared_memory.baseband_message = nullptr;
+    chSysDisable();
 
-	halt();
+    systick_stop();
+
+    ShutdownMessage shutdown_message;
+    shared_memory.application_queue.push(shutdown_message);
+
+    shared_memory.baseband_message = nullptr;
+
+    halt();
 }
-
 }

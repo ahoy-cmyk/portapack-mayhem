@@ -35,70 +35,118 @@
 #include "audio_output.hpp"
 #include "spectrum_collector.hpp"
 
-class WidebandFMAudio : public BasebandProcessor {
-public:
-	void execute(const buffer_c8_t& buffer) override;
+#include <array>
+#include <memory>
+#include <tuple>
+#include <variant>
 
-	void on_message(const Message* const message) override;
+template <typename... Args>
+class MultiDecimator {
+   public:
+    /* Dispatches to the underlying type's execute. */
+    template <typename Source, typename Destination>
+    Destination execute(
+        const Source& src,
+        const Destination& dst) {
+        return std::visit(
+            [&src, &dst](auto&& arg) -> Destination {
+                return arg.execute(src, dst);
+            },
+            decimator_);
+    }
 
-private:
-	static constexpr size_t baseband_fs = 3072000;
-	static constexpr auto spectrum_rate_hz = 50.0f;
+    size_t decimation_factor() const {
+        return std::visit(
+            [](auto&& arg) -> size_t {
+                return arg.decimation_factor;
+            },
+            decimator_);
+    }
 
-	BasebandThread baseband_thread { baseband_fs, this, NORMALPRIO + 20, baseband::Direction::Receive };
-	RSSIThread rssi_thread { NORMALPRIO + 10 };
+    /* Sets this decimator to a new instance of the specified decimator type.
+     * NB: The instance is returned by-ref so 'configure' can easily be called. */
+    template <typename Decimator>
+    Decimator& set() {
+        decimator_ = Decimator{};
+        return std::get<Decimator>(decimator_);
+    }
 
-	std::array<complex16_t, 512> dst { };
-	const buffer_c16_t dst_buffer {
-		dst.data(),
-		dst.size()
-	};
-	// work_audio_buffer and dst_buffer use the same data pointer
-	const buffer_s16_t work_audio_buffer {
-		(int16_t*)dst.data(),
-		sizeof(dst) / sizeof(int16_t)
-	};
-
-	std::array<complex16_t, 64> complex_audio { };
-	const buffer_c16_t complex_audio_buffer {
-		complex_audio.data(),
-		complex_audio.size()
-	};
-	
-	dsp::decimate::FIRC8xR16x24FS4Decim4 decim_0 { };
-	dsp::decimate::FIRC16xR16x16Decim2 decim_1 { };
-	int32_t channel_filter_low_f = 0;
-	int32_t channel_filter_high_f = 0;
-	int32_t channel_filter_transition = 0;
-
-	dsp::demodulate::FM demod { };
-	dsp::decimate::DecimateBy2CIC4Real audio_dec_1 { };
-	dsp::decimate::DecimateBy2CIC4Real audio_dec_2 { };
-	dsp::decimate::FIR64AndDecimateBy2Real audio_filter { };
-
-	AudioOutput audio_output { };
-	
-	// For fs=96kHz FFT streaming
-	BlockDecimator<complex16_t, 256> audio_spectrum_decimator { 1 };
-	std::array<std::complex<float>, 256> audio_spectrum { };
-	uint32_t audio_spectrum_timer { 0 };
-	enum AudioSpectrumState {
-		IDLE = 0,
-		FEED,
-		FFT
-	};
-	AudioSpectrumState audio_spectrum_state { IDLE };
-	AudioSpectrum spectrum { };
-	uint32_t fft_step { 0 };
-
-	SpectrumCollector channel_spectrum { };
-	size_t spectrum_interval_samples = 0;
-	size_t spectrum_samples = 0;
-
-	bool configured { false };
-	void configure(const WFMConfigureMessage& message);
-	void capture_config(const CaptureConfigMessage& message);
-	void post_message(const buffer_c16_t& data);
+   private:
+    std::variant<Args...> decimator_{};
 };
 
-#endif/*__PROC_WFM_AUDIO_H__*/
+class WidebandFMAudio : public BasebandProcessor {
+   public:
+    void execute(const buffer_c8_t& buffer) override;
+    void on_message(const Message* const message) override;
+
+   private:
+    static constexpr size_t baseband_fs = 3072000;
+    static constexpr auto spectrum_rate_hz = 50.0f;
+
+    std::array<complex16_t, 512> dst{};
+    const buffer_c16_t dst_buffer{
+        dst.data(),
+        dst.size()};
+    // work_audio_buffer and dst_buffer use the same data pointer
+    const buffer_s16_t work_audio_buffer{
+        (int16_t*)dst.data(),
+        sizeof(dst) / sizeof(int16_t)};
+
+    std::array<complex16_t, 64> complex_audio{};
+    const buffer_c16_t complex_audio_buffer{
+        complex_audio.data(),
+        complex_audio.size()};
+
+    dsp::decimate::FIRC8xR16x24FS4Decim4 decim_0{};
+    // dsp::decimate::FIRC16xR16x16Decim2 decim_1{};   //original condition , before adding wfmam
+
+    // decim_1 will handle different types of FIR filters depending on selection.
+    MultiDecimator<
+        dsp::decimate::FIRC16xR16x16Decim2,
+        dsp::decimate::FIRC16xR16x32Decim8>
+        decim_1{};
+
+    // dsp::decimate::FIRC16xR16x32Decim8 decim_1{}; // For FMAM
+
+    int32_t channel_filter_low_f = 0;
+    int32_t channel_filter_high_f = 0;
+    int32_t channel_filter_transition = 0;
+
+    dsp::demodulate::FM demod{};
+    dsp::decimate::DecimateBy2CIC4Real audio_dec_1{};
+    dsp::decimate::DecimateBy2CIC4Real audio_dec_2{};
+    dsp::decimate::FIR64AndDecimateBy2Real audio_filter{};
+
+    AudioOutput audio_output{};
+
+    // For fs=96kHz FFT streaming
+    BlockDecimator<complex16_t, 256> audio_spectrum_decimator{1};
+    std::array<std::complex<float>, 256> audio_spectrum{};
+    uint32_t audio_spectrum_timer{0};
+    enum AudioSpectrumState {
+        IDLE = 0,
+        FEED,
+        FFT
+    };
+    AudioSpectrumState audio_spectrum_state{IDLE};
+    AudioSpectrum spectrum{};
+    uint32_t fft_step{0};
+
+    SpectrumCollector channel_spectrum{};
+    size_t spectrum_interval_samples = 0;
+    size_t spectrum_samples = 0;
+
+    bool configured{false};
+
+    /* NB: Threads should be the last members in the class definition. */
+    BasebandThread baseband_thread{baseband_fs, this, baseband::Direction::Receive};
+    RSSIThread rssi_thread{};
+
+    void configure_wfm(const WFMConfigureMessage& message);
+    void configure_wfmam(const WFMAMConfigureMessage& message);
+    void capture_config(const CaptureConfigMessage& message);
+    void post_message(const buffer_c16_t& data);
+};
+
+#endif /*__PROC_WFM_AUDIO_H__*/

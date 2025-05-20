@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 Jared Boone, ShareBrained Technology, Inc.
  * Copyright (C) 2016 Furrtek
+ * Copyright (C) 2025 RocketGod - Added modes from my Flipper Zero RF Jammer App - https://betaskynet.com
  *
  * This file is part of PortaPack.
  *
@@ -27,33 +28,37 @@
 #include "baseband_thread.hpp"
 #include "portapack_shared_memory.hpp"
 #include "jammer.hpp"
+#include <random>
+#include <cmath>
 
 using namespace jammer;
 
 class JammerProcessor : public BasebandProcessor {
-public:
-	void execute(const buffer_c8_t& buffer) override;
-	
-	void on_message(const Message* const msg) override;
+   public:
+    void execute(const buffer_c8_t& buffer) override;
+    void on_message(const Message* const msg) override;
 
-private:
-	bool configured { false };
-	
-	BasebandThread baseband_thread { 3072000, this, NORMALPRIO + 20, baseband::Direction::Transmit };
-	
-	JammerChannel * jammer_channels {  };
-	
-	JammerType noise_type { };
-	uint32_t tone_delta { 0 }, lfsr { }, feedback { };
-	uint32_t noise_period { 0 }, period_counter { 0 };
-    uint32_t jammer_duration { 0 };
-    uint32_t current_range { 0 };
-	int64_t jammer_center { 0 }, jammer_bw { 0 };
-    uint32_t sample_count { 0 };
-	uint32_t aphase { 0 }, phase { 0 }, delta { 0 }, sphase { 0 };
-	int8_t sample { 0 };
-	int8_t re { 0 }, im { 0 };
-	RetuneMessage message { };
+   private:
+    bool configured{false};
+
+    JammerChannel* jammer_channels{};
+
+    JammerType noise_type{};
+    uint32_t tone_delta{0}, lfsr{}, feedback{};
+    uint32_t noise_period{0}, period_counter{0};
+    uint32_t jammer_duration{0};
+    uint32_t current_range{0};
+    int64_t jammer_center{0}, jammer_bw{0};
+    uint32_t sample_count{0};
+    uint32_t aphase{0}, phase{0}, delta{0}, sphase{0};
+    int8_t sample{0};
+    int8_t re{0}, im{0};
+    uint32_t wave_phase{0};
+    uint32_t wave_index{0};
+    float chirp_freq{0.0f};
+    RetuneMessage message{};
+
+    BasebandThread baseband_thread{3072000, this, baseband::Direction::Transmit};
 };
 
 #endif

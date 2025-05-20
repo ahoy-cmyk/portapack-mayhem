@@ -22,44 +22,58 @@
 #include "i2c_pp.hpp"
 
 void I2C::start(const I2CConfig& config) {
-	i2cStart(_driver, &config);
+    i2cStart(_driver, &config);
 }
 
 void I2C::stop() {
-	i2cStop(_driver);
+    i2cStop(_driver);
+}
+
+bool I2C::probe(i2caddr_t addr, systime_t timeout) {
+    i2cAcquireBus(_driver);
+    chSysLock();
+    _driver->errors = I2CD_NO_ERROR;
+    _driver->state = I2C_ACTIVE_TX;
+    msg_t rdymsg = i2c_lld_master_transmit_timeout(_driver, addr, nullptr, 0, nullptr, 0, timeout);
+    if (rdymsg == RDY_TIMEOUT)
+        _driver->state = I2C_LOCKED;
+    else
+        _driver->state = I2C_READY;
+    chSysUnlock();
+    i2cReleaseBus(_driver);
+    return (rdymsg == RDY_OK);
 }
 
 bool I2C::transfer(
-	const address_t slave_address,
-	const uint8_t* const data_tx, const size_t count_tx,
-	uint8_t* const data_rx, const size_t count_rx,
-	systime_t timeout
-) {
-	i2cAcquireBus(_driver);
-	const msg_t status = i2cMasterTransmitTimeout(
-		_driver, slave_address, data_tx, count_tx, data_rx, count_rx, timeout
-	);
-	i2cReleaseBus(_driver);
-	return (status == RDY_OK);
+    const address_t slave_address,
+    const uint8_t* const data_tx,
+    const size_t count_tx,
+    uint8_t* const data_rx,
+    const size_t count_rx,
+    systime_t timeout) {
+    i2cAcquireBus(_driver);
+    const msg_t status = i2cMasterTransmitTimeout(
+        _driver, slave_address, data_tx, count_tx, data_rx, count_rx, timeout);
+    i2cReleaseBus(_driver);
+    return (status == RDY_OK);
 }
 
 bool I2C::receive(
-	const address_t slave_address,
-	uint8_t* const data, const size_t count,
-	systime_t timeout
-) {
-	i2cAcquireBus(_driver);
-	const msg_t status = i2cMasterReceiveTimeout(
-		_driver, slave_address, data, count, timeout
-	);
-	i2cReleaseBus(_driver);
-	return (status == RDY_OK);
+    const address_t slave_address,
+    uint8_t* const data,
+    const size_t count,
+    systime_t timeout) {
+    i2cAcquireBus(_driver);
+    const msg_t status = i2cMasterReceiveTimeout(
+        _driver, slave_address, data, count, timeout);
+    i2cReleaseBus(_driver);
+    return (status == RDY_OK);
 }
 
 bool I2C::transmit(
-	const address_t slave_address,
-	const uint8_t* const data, const size_t count,
-	systime_t timeout
-) {
-	return transfer(slave_address, data, count, NULL, 0, timeout);
+    const address_t slave_address,
+    const uint8_t* const data,
+    const size_t count,
+    systime_t timeout) {
+    return transfer(slave_address, data, count, NULL, 0, timeout);
 }

@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 Jared Boone, ShareBrained Technology, Inc.
  * Copyright (C) 2016 Furrtek
+ * Copyright (C) 2023 Mark Thompson
  *
  * This file is part of PortaPack.
  *
@@ -33,47 +34,58 @@
 namespace audio {
 
 class Codec {
-public:
-	virtual ~Codec() { }
+   public:
+    virtual ~Codec() {}
 
-	virtual std::string name() const = 0;
+    virtual std::string name() const = 0;
 
-	virtual bool reset() = 0;
-	virtual void init() = 0;
+    virtual bool reset() = 0;
+    virtual void init() = 0;
 
-	virtual void speaker_enable() = 0;
- 	virtual void speaker_disable() = 0;
+    virtual void speaker_enable() = 0;
+    virtual void speaker_disable() = 0;
+    virtual bool speaker_disable_supported() const = 0;
 
-	virtual void headphone_enable() = 0;
-	virtual void headphone_disable() = 0;
-	virtual volume_range_t headphone_gain_range() const = 0;
-	virtual void set_headphone_volume(const volume_t volume) = 0;
+    virtual void headphone_enable() = 0;
+    virtual void headphone_disable() = 0;
+    virtual volume_range_t headphone_gain_range() const = 0;
+    virtual void set_headphone_volume(const volume_t volume) = 0;
 
-	virtual void microphone_enable(int8_t alc_mode) = 0;	// added user-GUI  AK4951 ,selected ALC mode.
-	virtual void microphone_disable() = 0;
+    virtual void microphone_enable(int8_t alc_mode, bool mic_to_HP_enabled) = 0;  // added user-GUI  AK4951 ,selected ALC mode.
+    virtual void microphone_disable() = 0;
 
-	virtual size_t reg_count() const = 0;
-	virtual size_t reg_bits() const = 0;
-	virtual uint32_t reg_read(const size_t register_number) = 0;
+    virtual void microphone_to_HP_enable() = 0;
+    virtual void microphone_to_HP_disable() = 0;
+
+    virtual size_t reg_count() const = 0;
+    virtual size_t reg_bits() const = 0;
+    virtual uint32_t reg_read(const size_t register_number) = 0;
+    virtual void reg_write(const size_t register_number, const uint32_t value) = 0;
 };
 
 namespace output {
 
-void start();		// this  other start(),no changed. ,in namespace output , used to config audio playback mode, 
+void start();  // this  other start(),no changed. ,in namespace output , used to config audio playback mode,
 void stop();
 
 void mute();
 void unmute();
 
+void speaker_disable();
+void speaker_enable();
 void speaker_mute();
 void speaker_unmute();
+void update_audio_mute();
 
 } /* namespace output */
 
 namespace input {
 
-void start(int8_t alc_mode);  // added parameter user-GUI select AK4951-ALC mode for config mic path,(recording mode in datasheet),
+void start(int8_t alc_mode, bool mic_to_HP_enabled);  // added parameters -GUI select AK4951-ALC mode for config mic path,(recording mode),and the check box "Hear Mic"
 void stop();
+
+void loopback_mic_to_hp_enable();
+void loopback_mic_to_hp_disable();
 
 } /* namespace input */
 
@@ -97,6 +109,7 @@ namespace debug {
 
 size_t reg_count();
 uint32_t reg_read(const size_t register_number);
+void reg_write(const size_t register_number, uint32_t value);
 std::string codec_name();
 size_t reg_bits();
 
@@ -104,15 +117,16 @@ size_t reg_bits();
 
 void init(audio::Codec* const codec);
 void shutdown();
+bool speaker_disable_supported();
 
 enum class Rate {
-	Hz_12000 = 4,
-	Hz_24000 = 2,
-	Hz_48000 = 1,
+    Hz_12000 = 4,
+    Hz_24000 = 2,
+    Hz_48000 = 1,
 };
 
 void set_rate(const Rate rate);
 
 } /* namespace audio */
 
-#endif/*__AUDIO_H__*/
+#endif /*__AUDIO_H__*/

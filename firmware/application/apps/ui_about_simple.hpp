@@ -3,38 +3,39 @@
 
 #include "ui_widget.hpp"
 #include "ui_navigation.hpp"
-#include "ui_font_fixed_8x16.hpp"
 
 #include <cstdint>
 
-namespace ui
-{
-    class AboutView : public View
-    {
-    public:
-        AboutView(NavigationView &nav);
-        void focus() override;
-        std::string title() const override { return "About"; };
-        int32_t timer{180};
-        short frame{0};
+namespace ui {
+class AboutView : public View {
+   public:
+    AboutView(NavigationView& nav);
+    void focus() override;
+    std::string title() const override { return "About"; };
 
-    private:
-        void update();
+   private:
+    virtual bool on_key(const KeyEvent event);
+    virtual bool on_encoder(const EncoderEvent event);
+    virtual bool on_touch(const TouchEvent event);
 
-        Console console{
-            {0, 10, 240, 240}};
+    bool interacted{false};
+    uint16_t frame_sync_count{0};
+    void on_frame_sync();
+    MenuView menu_view{
+        {0, 0, 240, 264},
+        true};
 
-        Button button_ok{
-            {240/3, 270, 240/3, 24},
-            "OK",
-        };
-
-        MessageHandlerRegistration message_handler_update{
-            Message::ID::DisplayFrameSync,
-            [this](const Message *const) {
-                this->update();
-            }};
+    Button button_ok{
+        {240 / 3, 270, 240 / 3, 24},
+        "OK",
     };
-} // namespace ui
+
+    MessageHandlerRegistration message_handler_frame_sync{
+        Message::ID::DisplayFrameSync,
+        [this](const Message* const) {
+            this->on_frame_sync();
+        }};
+};
+}  // namespace ui
 
 #endif /*__UI_ABOUT_SIMPLE_H__*/

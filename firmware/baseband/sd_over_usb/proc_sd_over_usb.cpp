@@ -22,26 +22,38 @@
 
 #include "ch.h"
 #include "hal.h"
+#include <libopencm3/lpc43xx/usb.h>
 
 extern "C" {
 void start_usb(void);
 void irq_usb(void);
 void usb_transfer(void);
 
+extern volatile bool scsi_running;
+
 CH_IRQ_HANDLER(Vector60) {
-	irq_usb();
+    const uint32_t status = USB0_USBSTS_D & USB0_USBINTR_D;
+    if (status & USB0_USBSTS_D_SLI) {
+        // USB reset received.
+        if (scsi_running) {
+            LPC_RGU->RESET_CTRL[0] = (1 << 0);
+        }
+    }
+    irq_usb();
 }
 }
 
 int main() {
-	sdcStart(&SDCD1, nullptr);
-	if (sdcConnect(&SDCD1) == CH_FAILED) chDbgPanic("no sd card #1");
+    sdcStart(&SDCD1, nullptr);
+    if (sdcConnect(&SDCD1) == CH_FAILED) chDbgPanic("no sd card #1");
 
-	start_usb();
+    start_usb();
 
-	while (true) {
-		usb_transfer();
-	}
+    while (true) {
+        usb_transfer();
+    }
 
-	return 0;
+    return 0;
 }
+
+void update_performance_counters() {}

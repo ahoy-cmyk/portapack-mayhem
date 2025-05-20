@@ -29,35 +29,44 @@
 #include <cstddef>
 
 class AudioStatsCollector {
-public:
-	template<typename Callback>
-	void feed(const buffer_f32_t& src, Callback callback) {
-		if( feed(src) ) {
-			callback(statistics);
-		}
-	}
+   public:
+    template <typename Callback>
+    void feed(const buffer_s16_t& src, Callback callback) {
+        if (feed(src)) {
+            callback(statistics);
+        }
+    }
 
-	template<typename Callback>
-	void mute(const size_t sample_count, const size_t sampling_rate, Callback callback) {
-		if( mute(sample_count, sampling_rate) ) {
-			callback(statistics);
-		}
-	}
+    template <typename Callback>
+    void feed(const buffer_f32_t& src, Callback callback) {
+        if (feed(src)) {
+            callback(statistics);
+        }
+    }
 
-private:
-	static constexpr float update_interval { 0.1f };
-	float squared_sum { 0 };
-	float max_squared { 0 };
-	size_t count { 0 };
+    template <typename Callback>
+    void mute(const size_t sample_count, const size_t sampling_rate, Callback callback) {
+        if (mute(sample_count, sampling_rate)) {
+            callback(statistics);
+        }
+    }
 
-	AudioStatistics statistics { };
+   private:
+    static constexpr float update_interval{0.1f};
+    float squared_sum{0};
+    float max_squared{0};
+    size_t count{0};
 
-	void consume_audio_buffer(const buffer_f32_t& src);
+    AudioStatistics statistics{};
 
-	bool update_stats(const size_t sample_count, const size_t sampling_rate);
+    void consume_audio_buffer(const buffer_s16_t& src);
+    void consume_audio_buffer(const buffer_f32_t& src);
 
-	bool feed(const buffer_f32_t& src);
-	bool mute(const size_t sample_count, const size_t sampling_rate);
+    bool update_stats(const size_t sample_count, const size_t sampling_rate);
+
+    bool feed(const buffer_s16_t& src);
+    bool feed(const buffer_f32_t& src);
+    bool mute(const size_t sample_count, const size_t sampling_rate);
 };
 
-#endif/*__AUDIO_STATS_COLLECTOR_H__*/
+#endif /*__AUDIO_STATS_COLLECTOR_H__*/

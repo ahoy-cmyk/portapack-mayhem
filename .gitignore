@@ -13,6 +13,7 @@
 /sdcard/FREQMAN/BHT*
 /sdcard/FREQMAN/R.TXT
 /sdcard/FREQMAN/XXX.TXT
+/armbin
 
 # Compiled Object files
 *.slo
@@ -48,23 +49,36 @@
 *.map
 *.lst
 .dep/
-build/
+/build*
 CMakeFiles/
+cmake-build-debug/
 
 # Debugging
 .gdbinit*
 
-# Editor files
+# Editor/ IDE files
 *.sublime-project
 *.sublime-workspace
 .vscode
+.idea
+*.swp
+
+# VSCodium extensions
+.history
 
 # Host OS leftovers
 .DS_Store
 /firmware/CMakeCache.txt
 
-# Python env
+# Python env/ venv and cache
 env/
+venv/
+**/__pycache__/
+*.pyc
 
 # Other
 *.bak
+
+# generated bitmap arr file
+# TODO: generate bitmap during build, since we use python during build anyway, lemme know if this is a bad idea @zxkmm
+/firmware/tools/bitmap.hpp

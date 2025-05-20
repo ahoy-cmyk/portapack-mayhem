@@ -1,85 +1,134 @@
 #include "ui_about_simple.hpp"
+#include <string_view>
 
-namespace ui
-{
-    AboutView::AboutView(NavigationView &nav)
-    {
-        add_children({&console, &button_ok});
+#define ROLL_SPEED_FRAME_PER_LINE 60
+// cuz frame rate of pp screen is probably 60, scroll per sec
 
-        button_ok.on_select = [&nav](Button &)
-        {
-            nav.pop();
-        };
+namespace ui {
 
-        console.writeln("\x1B\x07List of contributors:\x1B\x10");
-        console.writeln("");
-    }
+// Information: a line starting with a '#' will be yellow coloured
+constexpr std::string_view mayhem_information_list[] = {
+    "#****** Mayhem Community ******",
+    " ",
+    "  https://discord.mayhem.app",
+    " ",
+    "#**** List of contributors ****",
+    " ",
+    "#Mayhem-Firmware:",
+    "jboone,eried,furrtek,",
+    "NotherNgineer,gullradriel,",
+    "jLynx,kallanreed,Brumi-2021,",
+    "htotoo,zxkmm,bernd-herzog,",
+    "ArjanOnwezen,euquiq,u-foka,",
+    "iNetro,heurist1,dqs105,",
+    "teixeluis,jwetzell,",
+    "jimilinuxguy,gregoryfenton,",
+    "notpike,strijar,BehleZebub,",
+    "arneluehrs,mcules,rascafr,",
+    "joyel24,ImDroided,zigad,",
+    "johnelder,klockee,nnesetto,",
+    "LupusE,argilo,dc2dc,formtapez,",
+    "RocketGod-git,mrmookie,",
+    "ITAxReal,F33RNI,F4GEV,",
+    "rusty-labs,mjwaxios,andrej-mk,",
+    "RedFox-Fr,nemanjan00,",
+    "MichalLeonBorsuk,",
+    "MatiasFernandez,Giorgiofox",
+    " ",
+    "#Havoc:",
+    "jboone,furrtek,eried,argilo,",
+    "mrmookie,Giorgiofox,ImDroided,",
+    "mjwaxios,F4GEV,OpCode1300,",
+    "ZeroChaos-,RndmNmbr,",
+    "silascutler,troussos,z4ziggy,",
+    "clem-42,dhoetger,NickBouwhuis,",
+    "xmycroftx,Maescool,KimIV,",
+    "joakar,leres,brianlechthaler,",
+    "N0vaPixel",
+    " ",
+    "#PortaPack:",
+    "jboone,mossmann,martinling,",
+    "argilo,eried,ZeroChaos-,",
+    "RndmNmbr",
+    " ",
+    "#HackRF:",
+    "mossmann,jboone,dominicgs,",
+    "martinling,bvernoux,miek,",
+    "bgamari,schneider42,straithe,",
+    "grvvy,willcode,hessu,yhetti,",
+    "Sec42,ckuethe",
+    " "};
 
-    void AboutView::update()
-    {
-        if (++timer > 200)
-        {
-            timer = 0;
+AboutView::AboutView(NavigationView& nav) {
+    add_children({&menu_view,
+                  &button_ok});
 
-            switch (++frame)
-            {
-            case 1:
-                // TODO: Generate this automatically from github
-                // https://github.com/eried/portapack-mayhem/graphs/contributors?to=2022-01-01&from=2020-04-12&type=c
-                console.writeln("\x1B\x06Mayhem:\x1B\x10");
-                console.writeln("eried,euquiq,gregoryfenton");
-                console.writeln("johnelder,jwetzell,nnemanjan00");
-                console.writeln("N0vaPixel,klockee,GullCode");
-                console.writeln("jamesshao8,ITAxReal,rascafr");
-                console.writeln("mcules,dqs105,strijar");
-                console.writeln("zhang00963,RedFox-Fr,aldude999");
-                console.writeln("East2West,fossum,ArjanOnwezen");
-                console.writeln("vXxOinvizioNxX,teixeluis");
-                console.writeln("Brumi-2021,texasyojimbo");
-                console.writeln("heurist1,intoxsick,ckuethe");
-                console.writeln("notpike,jLynx,zigad");
-                console.writeln("MichalLeonBorsuk,jimilinuxguy");
-                console.writeln("");
-                break;
+    button_ok.on_select = [&nav](Button&) {
+        nav.pop();
+    };
 
-            case 2:
-                // https://github.com/eried/portapack-mayhem/graphs/contributors?to=2020-04-12&from=2015-07-31&type=c
-                console.writeln("\x1B\x06Havoc:\x1B\x10");
-                console.writeln("furrtek,mrmookie,NotPike");
-                console.writeln("mjwaxios,ImDroided,Giorgiofox");
-                console.writeln("F4GEV,z4ziggy,xmycroftx");
-                console.writeln("troussos,silascutler");
-                console.writeln("nickbouwhuis,msoose,leres");
-                console.writeln("joakar,dhoetger,clem-42");
-                console.writeln("brianlechthaler,ZeroChaos-...");
-                console.writeln("");
-                break;
+    menu_view.on_left = [this]() {
+        button_ok.focus();
+    };
 
-            case 3:
-                // https://github.com/eried/portapack-mayhem/graphs/contributors?from=2014-07-05&to=2015-07-31&type=c
-                console.writeln("\x1B\x06PortaPack:\x1B\x10");
-                console.writeln("jboone,argilo");
-                console.writeln("");
-                break;
+    menu_view.on_right = [this]() {
+        button_ok.focus();
+    };
 
-            case 4:
-                // https://github.com/mossmann/hackrf/graphs/contributors
-                console.writeln("\x1B\x06HackRF:\x1B\x10");
-                console.writeln("mossmann,dominicgs,bvernoux");
-                console.writeln("bgamari,schneider42,miek");
-                console.writeln("willcode,hessu,Sec42");
-                console.writeln("yhetti,ckuethe,smunaut");
-                console.writeln("wishi,mrbubble62,scateu...");
-                console.writeln("");
-                frame = 0; // Loop
-                break;
+    for (auto& authors_line : mayhem_information_list) {
+        // if it's starting with #, it's a title and we have to substract the '#' and paint yellow
+        if (authors_line.size() > 0) {
+            if (authors_line[0] == '#') {
+                menu_view.add_item(
+                    {(std::string)authors_line.substr(1, authors_line.size() - 1),
+                     ui::Theme::getInstance()->fg_yellow->foreground,
+                     nullptr,
+                     nullptr});
+            } else {
+                menu_view.add_item(
+                    {(std::string)authors_line,
+                     Theme::getInstance()->bg_darkest->foreground,
+                     nullptr,
+                     nullptr});
             }
         }
     }
+}
 
-    void AboutView::focus()
-    {
-        button_ok.focus();
+void AboutView::on_frame_sync() {
+    if (interacted) return;
+
+    if (frame_sync_count++ % ROLL_SPEED_FRAME_PER_LINE == 0) {
+        const auto current = menu_view.highlighted_index();
+        const auto count = menu_view.item_count();
+
+        if (current < count - 1) {
+            menu_view.set_highlighted(current + 1);
+        } else {
+            menu_view.set_highlighted(0);
+        }
     }
+}
+
+void AboutView::focus() {
+    button_ok.focus();
+    menu_view.set_highlighted(3);  // contributors block starting line
+}
+
+bool AboutView::on_touch(const TouchEvent) {
+    interacted = true;
+    return false;
+}
+
+bool AboutView::on_key(const KeyEvent) {
+    interacted = true;
+    return false;
+}
+
+bool AboutView::on_encoder(const EncoderEvent) {
+    interacted = true;
+    menu_view.focus();
+    return false;
+}
 
 } /* namespace ui */

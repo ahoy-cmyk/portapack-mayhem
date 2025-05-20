@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 Jared Boone, ShareBrained Technology, Inc.
+ * Copyright (C) 2023 Mark Thompson
  *
  * This file is part of PortaPack.
  *
@@ -34,56 +35,59 @@ namespace ert {
 using ID = uint32_t;
 using Consumption = uint32_t;
 using CommodityType = uint32_t;
+using TamperFlags = uint32_t;
 
 constexpr ID invalid_id = 0;
 constexpr CommodityType invalid_commodity_type = -1;
 constexpr Consumption invalid_consumption = 0;
+constexpr TamperFlags invalid_tamper_flags = 0;
 
 class Packet {
-public:
-	enum class Type : uint32_t {
-		Unknown = 0,
-		IDM = 1,
-		SCM = 2,
-	};
+   public:
+    enum class Type : uint32_t {
+        Unknown = 0,
+        IDM = 1,
+        SCM = 2,
+        SCMPLUS = 3,
+    };
 
-	Packet(
-		const Type type,
-		const baseband::Packet& packet
-	) : packet_ { packet },
-		decoder_ { packet_ },
-		reader_ { decoder_ },
-		type_ { type }
-	{
-	}
+    Packet(
+        const Type type,
+        const baseband::Packet& packet)
+        : packet_{packet},
+          decoder_{packet_},
+          reader_{decoder_},
+          type_{type} {
+    }
 
-	size_t length() const;
-	
-	bool is_valid() const;
+    size_t length() const;
 
-	Timestamp received_at() const;
+    bool is_valid() const;
 
-	Type type() const;
-	ID id() const;
-	CommodityType commodity_type() const;
-	Consumption consumption() const;
+    Timestamp received_at() const;
 
-	FormattedSymbols symbols_formatted() const;
+    Type type() const;
+    ID id() const;
+    CommodityType commodity_type() const;
+    Consumption consumption() const;
+    TamperFlags tamper_flags() const;
 
-	bool crc_ok() const;
+    FormattedSymbols symbols_formatted() const;
 
-private:
-	using Reader = FieldReader<ManchesterDecoder, BitRemapNone>;
+    bool crc_ok() const;
 
-	const baseband::Packet packet_;
-	const ManchesterDecoder decoder_;
-	const Reader reader_;
-	const Type type_;
+   private:
+    using Reader = FieldReader<ManchesterDecoder, BitRemapNone>;
 
-	bool crc_ok_idm() const;
-	bool crc_ok_scm() const;
+    const baseband::Packet packet_;
+    const ManchesterDecoder decoder_;
+    const Reader reader_;
+    const Type type_;
+
+    bool crc_ok_ccitt() const;
+    bool crc_ok_scm() const;
 };
 
 } /* namespace ert */
 
-#endif/*__ERT_PACKET_H__*/
+#endif /*__ERT_PACKET_H__*/

@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2015 Jared Boone, ShareBrained Technology, Inc.
  * Copyright (C) 2017 Furrtek
+ * Copyright (C) 2024 Mark Thompson
  *
  * This file is part of PortaPack.
  *
@@ -25,6 +26,7 @@
 
 #include "ui_navigation.hpp"
 #include "ui_receiver.hpp"
+#include "ui_freq_field.hpp"
 #include "ui_rssi.hpp"
 #include "ui_qrcode.hpp"
 #include "ui_geomap.hpp"
@@ -35,181 +37,178 @@
 
 #include "sonde_packet.hpp"
 #include "app_settings.hpp"
+#include "radio_state.hpp"
 #include <cstddef>
 #include <string>
 
 class SondeLogger {
-public:
-	Optional<File::Error> append(const std::filesystem::path& filename) {
-		return log_file.append(filename);
-	}
-	
-	void on_packet(const sonde::Packet& packet);
+   public:
+    Optional<File::Error> append(const std::filesystem::path& filename) {
+        return log_file.append(filename);
+    }
 
-private:
-	LogFile log_file { };
+    void on_packet(const sonde::Packet& packet);
+
+   private:
+    LogFile log_file{};
 };
 
 namespace ui {
 
 class SondeView : public View {
-public:
-	static constexpr uint32_t sampling_rate = 2457600;
-	static constexpr uint32_t baseband_bandwidth = 1750000;
-		
-	SondeView(NavigationView& nav);
-	~SondeView();
+   public:
+    static constexpr uint32_t initial_target_frequency = 402700000;
 
-	void focus() override;
+    SondeView(NavigationView& nav);
+    ~SondeView();
+    SondeView(const SondeView& other) = delete;
+    SondeView& operator=(const SondeView& other) = delete;
 
-	std::string title() const override { return "Radiosnd RX"; };
+    void focus() override;
 
-	
+    std::string title() const override { return "Radiosnd RX"; };
 
-private:
-	std::unique_ptr<SondeLogger> logger { };
-	uint32_t target_frequency_ { 402700000 };
-	bool logging { false };
-	bool use_crc { false };
-	bool beep { false };
+   private:
+    NavigationView& nav_;
+    RxRadioState radio_state_{
+        402700000 /* frequency */,
+        1750000 /* bandwidth */,
+        2457600 /* sampling rate */
+    };
+    bool logging{false};
+    bool use_crc{false};
+    app_settings::SettingsManager settings_{
+        "rx_sonde",
+        app_settings::Mode::RX,
+        {
+            {"logging"sv, &logging},
+            {"use_crc"sv, &use_crc},
+        }};
 
-	char geo_uri[32]  = {};
-	// app save settings
-	std::app_settings 		settings { }; 		
-	std::app_settings::AppSettings 	app_settings { };	 
+    std::unique_ptr<SondeLogger> logger{};
 
-	sonde::GPS_data gps_info { };
-	sonde::temp_humid temp_humid_info { };
-	std::string sonde_id { };
-	
-	// AudioOutput audio_output { };
+    sonde::GPS_data gps_info{};
+    sonde::temp_humid temp_humid_info{};
+    std::string sonde_id{};
 
-	Labels labels {
-		{ { 4 * 8, 2 * 16 }, "Type:", Color::light_grey() },
-		{ { 6 * 8, 3 * 16 }, "ID:", Color::light_grey() },
-		{ { 0 * 8, 4 * 16 }, "DateTime:", Color::light_grey() },
+    // AudioOutput audio_output { };
 
-		{ { 3 * 8, 5 * 16 }, "Vbatt:", Color::light_grey() },
-		{ { 3 * 8, 6 * 16 }, "Frame:", Color::light_grey() },
-		{ { 4 * 8, 7 * 16 }, "Temp:", Color::light_grey() },
-		{ { 0 * 8, 8 * 16 }, "Humidity:", Color::light_grey() }
-	};
+    Labels labels{
+        {{4 * 8, 2 * 16}, "Type:", Theme::getInstance()->fg_light->foreground},
+        {{6 * 8, 3 * 16}, "ID:", Theme::getInstance()->fg_light->foreground},
+        {{0 * 8, 4 * 16}, "DateTime:", Theme::getInstance()->fg_light->foreground},
 
-	FrequencyField field_frequency {
-		{ 0 * 8, 0 * 8 },
-	};
+        {{3 * 8, 5 * 16}, "Vbatt:", Theme::getInstance()->fg_light->foreground},
+        {{3 * 8, 6 * 16}, "Frame:", Theme::getInstance()->fg_light->foreground},
+        {{4 * 8, 7 * 16}, "Temp:", Theme::getInstance()->fg_light->foreground},
+        {{0 * 8, 8 * 16}, "Humidity:", Theme::getInstance()->fg_light->foreground}};
 
-	RFAmpField field_rf_amp {
-		{ 13 * 8, 0 * 16 }
-	};
+    RxFrequencyField field_frequency{
+        {0 * 8, 0 * 8},
+        nav_};
 
-	LNAGainField field_lna {
-		{ 15 * 8, 0 * 16 }
-	};
+    RFAmpField field_rf_amp{
+        {13 * 8, 0 * 16}};
 
-	VGAGainField field_vga {
-		{ 18 * 8, 0 * 16 }
-	};
+    LNAGainField field_lna{
+        {15 * 8, 0 * 16}};
 
-	RSSI rssi {
-		{ 21 * 8, 0, 6 * 8, 4 },
-	};
-	
-	NumberField field_volume {
-		{ 28 * 8, 0 * 16 },
-		2,
-		{ 0, 99 },
-		1,
-		' ',
-	};
-	
+    VGAGainField field_vga{
+        {18 * 8, 0 * 16}};
 
-	Checkbox check_beep {
-		{ 22 * 8, 6 * 16 },
-		3,
-		"Beep"
-	};
+    RSSI rssi{
+        {21 * 8, 0, 6 * 8, 4}};
 
-	Checkbox check_log {
-		{ 22 * 8, 8 * 16 },
-		3,
-		"Log"
-	};
-	
-	Checkbox check_crc {
-		{ 22 * 8, 10 * 16 },
-		3,
-		"CRC"
-	};
-	
-	Text text_signature {
-		{ 9 * 8, 2 * 16, 10 * 8, 16 },
-		"..."
-	};
+    AudioVolumeField field_volume{
+        {28 * 8, 0 * 16}};
 
-	Text text_serial {
-		{ 9 * 8, 3 * 16, 11 * 8, 16 },
-		"..."
-	};
+    Checkbox check_log{
+        {22 * 8, 8 * 16},
+        3,
+        "Log"};
 
-	Text text_timestamp {
-		{ 9 * 8, 4 * 16, 11 * 8, 16 },
-		"..."
-	};
+    Checkbox check_crc{
+        {22 * 8, 10 * 16},
+        3,
+        "CRC"};
 
-	Text text_voltage {
-		{ 9 * 8, 5 * 16, 10 * 8, 16 },
-		"..."
-	};
+    Text text_signature{
+        {9 * 8, 2 * 16, 10 * 8, 16},
+        "..."};
 
-	Text text_frame {
-		{ 9 * 8, 6 * 16, 10 * 8, 16 },
-		"..."
-	};
+    Text text_serial{
+        {9 * 8, 3 * 16, 11 * 8, 16},
+        "..."};
 
-	Text text_temp {
-		{ 9 * 8, 7 * 16, 10 * 8, 16 },
-		"..."
-	};
+    Text text_timestamp{
+        {9 * 8, 4 * 16, 11 * 8, 16},
+        "..."};
 
-	Text text_humid {
-		{ 9 * 8, 8 * 16, 10 * 8, 16 },
-		"..."
-	};
+    Text text_voltage{
+        {9 * 8, 5 * 16, 10 * 8, 16},
+        "..."};
 
-	GeoPos geopos {
-		{ 0, 12 * 16 },
-		GeoPos::alt_unit::METERS
-	};
+    Text text_frame{
+        {9 * 8, 6 * 16, 10 * 8, 16},
+        "..."};
 
+    Text text_temp{
+        {9 * 8, 7 * 16, 10 * 8, 16},
+        "..."};
 
-	Button button_see_qr {
-		{ 2 * 8, 15 * 16, 12 * 8, 3 * 16 },
-		"See QR" 
-	};		
+    Text text_humid{
+        {9 * 8, 8 * 16, 10 * 8, 16},
+        "..."};
 
-	Button button_see_map {
-		{ 16 * 8, 15 * 16, 12 * 8, 3 * 16 },
-		"See on map"
-	};
+    GeoPos geopos{
+        {0, 12 * 16},
+        GeoPos::alt_unit::METERS,
+        GeoPos::spd_unit::HIDDEN};
 
-	MessageHandlerRegistration message_handler_packet {
-		Message::ID::SondePacket,
-		[this](Message* const p) {
-			const auto message = static_cast<const SondePacketMessage*>(p);
-			const sonde::Packet packet { message->packet, message->type };
-			this->on_packet(packet);
-		}
-	};
+    Button button_see_qr{
+        {2 * 8, 15 * 16, 12 * 8, 3 * 16},
+        "See QR"};
 
-	void on_packet(const sonde::Packet& packet);
-	void on_headphone_volume_changed(int32_t v);
-	char * float_to_char(float x, char *p);
-	void set_target_frequency(const uint32_t new_value);
+    Button button_see_map{
+        {16 * 8, 15 * 16, 12 * 8, 3 * 16},
+        "See on map"};
 
-	uint32_t tuning_frequency() const;
+    GeoMapView* geomap_view_{nullptr};
+
+    MessageHandlerRegistration message_handler_packet{
+        Message::ID::SondePacket,
+        [this](Message* const p) {
+            const auto message = static_cast<const SondePacketMessage*>(p);
+            const sonde::Packet packet{message->packet, message->type};
+            this->on_packet(packet);
+        }};
+
+    MessageHandlerRegistration message_handler_gps{
+        Message::ID::GPSPosData,
+        [this](Message* const p) {
+            const auto message = static_cast<const GPSPosDataMessage*>(p);
+            this->on_gps(message);
+        }};
+    MessageHandlerRegistration message_handler_orientation{
+        Message::ID::OrientationData,
+        [this](Message* const p) {
+            const auto message = static_cast<const OrientationDataMessage*>(p);
+            this->on_orientation(message);
+        }};
+    MessageHandlerRegistration message_handler_freqchg{
+        Message::ID::FreqChangeCommand,
+        [this](Message* const p) {
+            const auto message = static_cast<const FreqChangeCommandMessage*>(p);
+            this->on_freqchg(message->freq);
+        }};
+
+    void on_freqchg(int64_t freq);
+
+    void on_gps(const GPSPosDataMessage* msg);
+    void on_orientation(const OrientationDataMessage* msg);
+    void on_packet(const sonde::Packet& packet);
 };
 
 } /* namespace ui */
 
-#endif/*__UI_SONDE_H__*/
+#endif /*__UI_SONDE_H__*/
